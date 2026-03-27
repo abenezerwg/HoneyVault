@@ -13,7 +13,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const { query } = require('../db/client');
-const { rotateVaultToken, createVaultToken } = require('./tokenVault');
+const { rotateVaultToken, getUsersWithConnectedAccounts } = require('./tokenVault');
 const { broadcast } = require('./notifier');
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -155,38 +155,57 @@ async function executeTool(toolName, toolInput, incidentId) {
 
     case 'rotate_credentials': {
       const results = [];
-      for (const tokenId of toolInput.real_token_ids) {
-        try {
-          // Generate new fake credentials to replace old ones
-          const newCredentials = {
-            client_id: `rotated_${Date.now()}`,
-            client_secret: generateNewSecret(),
-            rotated_at: new Date().toISOString(),
-            rotation_reason: toolInput.reason,
-          };
 
-          await rotateVaultToken(tokenId, newCredentials);
+      // Get all users with connected accounts in Token Vault
+      const users = await getUsersWithConnectedAccounts('google-oauth2');
+
+      for (const user of users) {
+        const googleIdentity = user.identities?.find(
+            id => id.connection === 'google-oauth2'
+        );
+
+        if (!googleIdentity) continue;
+
+        try {
+          // Unlink the Google identity — this invalidates the Token Vault entry
+          await rotateVaultToken(
+              user.user_id,
+              'google-oauth2',
+              googleIdentity.user_id
+          );
 
           // Update DB
           await query(
-            `UPDATE real_tokens SET last_rotated = NOW() WHERE vault_token_id = $1`,
-            [tokenId]
+              `UPDATE real_tokens SET last_rotated = NOW() WHERE service = 'google'`
           );
 
-          results.push({ token_id: tokenId, status: 'rotated', timestamp: new Date().toISOString() });
+          results.push({
+            user_id: user.user_id,
+            email: user.email,
+            status: 'rotated',
+            timestamp: new Date().toISOString(),
+          });
 
-          // Broadcast rotation event to dashboard
           broadcast({
             type: 'credential_rotated',
-            tokenId,
+            tokenId: result.userId || tokenId,
+            label: `Google OAuth — ${result.userId}`,
             timestamp: new Date().toISOString(),
           });
         } catch (err) {
-          results.push({ token_id: tokenId, status: 'failed', error: err.message });
+          results.push({
+            user_id: user.user_id,
+            status: 'failed',
+            error: err.message,
+          });
         }
       }
 
-      return { rotations: results, total: results.length, success: results.filter(r => r.status === 'rotated').length };
+      return {
+        rotations: results,
+        total: results.length,
+        success: results.filter(r => r.status === 'rotated').length,
+      };
     }
 
     case 'generate_incident_report': {

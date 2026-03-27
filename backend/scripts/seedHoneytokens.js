@@ -6,9 +6,8 @@
  * Usage: npm run seed:honeytokens
  */
 
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config();
 const { initDb, query } = require('../db/client');
-const { createHoneytoken, createVaultToken } = require('../services/tokenVault');
 
 const HONEYTOKENS_TO_PLANT = [
   { disguiseAs: 'github-prod', serviceProvider: 'github' },
@@ -57,14 +56,13 @@ async function seed() {
         continue;
       }
 
-      // Create in Token Vault (fake but realistic credentials)
-      const { vaultToken, fakeClientId, fakeSecret } = await createHoneytoken(config);
+      // Generate a realistic-looking fake client_id directly in DB
+      const fakeClientId = `honey_${config.serviceProvider}_${Math.random().toString(36).slice(2, 10)}`;
 
-      // Save to DB
       await query(
-        `INSERT INTO honeytokens (client_id, label, disguise_as, vault_token_id, is_active)
-         VALUES ($1, $2, $3, $4, true)`,
-        [fakeClientId, `${config.disguiseAs}`, config.disguiseAs, vaultToken?.id || null]
+          `INSERT INTO honeytokens (client_id, label, disguise_as, vault_token_id, is_active)
+           VALUES ($1, $2, $3, $4, true)`,
+          [fakeClientId, `${config.disguiseAs}`, config.disguiseAs, null]
       );
 
       console.log(`  ✅ Planted honeytoken for: ${config.disguiseAs}`);

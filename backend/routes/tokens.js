@@ -15,12 +15,12 @@ const { createHoneytoken, listVaultTokens } = require('../services/tokenVault');
 router.get('/honeytokens', async (req, res) => {
   try {
     const { rows } = await query(`
-      SELECT 
+      SELECT
         h.*,
         COUNT(i.id) as incident_count,
         MAX(i.created_at) as last_triggered
       FROM honeytokens h
-      LEFT JOIN incidents i ON i.honeytoken_id = h.id
+             LEFT JOIN incidents i ON i.honeytoken_id = h.id
       GROUP BY h.id
       ORDER BY h.created_at DESC
     `);
@@ -47,10 +47,10 @@ router.post('/honeytokens', async (req, res) => {
 
     // Save to DB
     const { rows } = await query(
-      `INSERT INTO honeytokens (client_id, label, disguise_as, vault_token_id, is_active)
-       VALUES ($1, $2, $3, $4, true)
-       RETURNING *`,
-      [fakeClientId, `${disguiseAs}-honey`, disguiseAs, vaultToken.id || null]
+        `INSERT INTO honeytokens (client_id, label, disguise_as, vault_token_id, is_active)
+         VALUES ($1, $2, $3, $4, true)
+           RETURNING *`,
+        [fakeClientId, `${disguiseAs}-honey`, disguiseAs, vaultToken.id || null]
     );
 
     res.json({ honeytoken: rows[0], vaultToken });
@@ -67,8 +67,8 @@ router.post('/honeytokens', async (req, res) => {
 router.delete('/honeytokens/:id', async (req, res) => {
   try {
     await query(
-      `UPDATE honeytokens SET is_active = false WHERE id = $1`,
-      [req.params.id]
+        `UPDATE honeytokens SET is_active = false WHERE id = $1`,
+        [req.params.id]
     );
     res.json({ deactivated: true });
   } catch (err) {
@@ -103,8 +103,8 @@ router.post('/real', async (req, res) => {
     const { label, vaultTokenId, service } = req.body;
 
     const { rows } = await query(
-      `INSERT INTO real_tokens (label, vault_token_id, service) VALUES ($1, $2, $3) RETURNING *`,
-      [label, vaultTokenId, service]
+        `INSERT INTO real_tokens (label, vault_token_id, service) VALUES ($1, $2, $3) RETURNING *`,
+        [label, vaultTokenId, service]
     );
 
     res.json(rows[0]);
@@ -164,6 +164,39 @@ router.get('/stats', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/tokens/vault-status
+ * Returns real-time status of Token Vault connected accounts
+ * Used by the dashboard to show before/after rotation
+ */
+router.get('/vault-status', async (req, res) => {
+  try {
+    const { getUsersWithConnectedAccounts} = require('../services/tokenVault');
+    const users = await getUsersWithConnectedAccounts('google-oauth2');
+
+    const status = users.map(user => {
+      const googleIdentity = user.identities?.find(
+          id => id.connection === 'google-oauth2'
+      );
+      const wasRotated = !!user.app_metadata?.google_rotated_at;
+      const isBlocked = !!user.blocked;
+      return {
+        userId: user.user_id,
+        email: user.email,
+        googleConnected: !!googleIdentity && !isBlocked,
+        tokenPresent: !!googleIdentity?.access_token && !wasRotated,
+        isBlocked,
+        lastRotated: user.app_metadata?.google_rotated_at || null,
+      };
+    });
+
+    res.json({ users: status });
+  } catch (err) {
+    console.error('[Vault Status] Error:', err.message);
+    res.status(500).json({ error: err.message, users: [] });
   }
 });
 

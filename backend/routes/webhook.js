@@ -47,7 +47,7 @@ router.post('/honeytoken', async (req, res) => {
     const signature = req.headers['x-hub-signature-256'] || req.headers['x-signature'];
 
     // Verify signature
-    if (!verifySignature(rawBody, signature)) {
+    if (process.env.NODE_ENV !== 'development' && !verifySignature(rawBody, signature)) {
       console.warn('[Webhook] Invalid signature — rejecting');
       return res.status(401).json({ error: 'Invalid signature' });
     }
