@@ -80,9 +80,9 @@ async function start() {
     await initDb();
     console.log('[DB] Database connected and initialized');
 
-    server.listen(PORT, () => {
+    const PORT = process.env.PORT || 3001;
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`[SERVER] HoneyVault backend running on port ${PORT}`);
-      console.log(`[WS]     WebSocket server running on ws://localhost:${PORT}/ws`);
     });
   } catch (err) {
     console.error('[FATAL] Failed to start:', err);
