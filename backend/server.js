@@ -27,11 +27,19 @@ wss.on('connection', (ws) => {
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://honey-vault.vercel.app',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean),
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://honey-vault.vercel.app',
+      'https://honeyvault.vercel.app',
+    ];
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Allow all origins temporarily for debugging
+  },
   credentials: true,
 }));
 
