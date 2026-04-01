@@ -120,15 +120,18 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     try {
-      const [s, h, i, v] = await Promise.all([
+      const [s, h, i] = await Promise.all([
         fetchStats(),
         fetchHoneytokens(),
         fetchIncidents(),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tokens/vault-status`).then(r => r.json()),
       ]);
       setStats(s);
       setHoneytokens(h);
       setIncidents(i.incidents || []);
+
+      // Fetch vault status separately
+      const v = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tokens/vault-status`)
+          .then(r => r.json());
       setVaultUsers(v.users || []);
     } catch (e) {
       console.error('Failed to load data:', e);
