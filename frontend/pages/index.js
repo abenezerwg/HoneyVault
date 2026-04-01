@@ -265,7 +265,7 @@ export default function Dashboard() {
                 🔐 Connect your Google account to store real credentials in Token Vault
               </span>
                   <a
-                      href="/api/auth/login?connection=google-oauth2&returnTo=/"
+                      href="/api/auth/login?connection=google-oauth2"
                       style={{ background: '#7c5cbf', color: '#fff', padding: '6px 16px', textDecoration: 'none', fontSize: 11, letterSpacing: '0.08em' }}
                   >
                     CONNECT GOOGLE
