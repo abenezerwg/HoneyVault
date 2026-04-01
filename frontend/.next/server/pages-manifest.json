@@ -1,7 +1,1 @@
-{
-  "/_app": "pages/_app.js",
-  "/_error": "pages/_error.js",
-  "/_document": "pages/_document.js",
-  "/": "pages/index.js",
-  "/api/auth/[...auth0]": "pages/api/auth/[...auth0].js"
-}
+{"/_error":"pages/_error.js","/api/auth/[...auth0]":"pages/api/auth/[...auth0].js","/":"pages/index.html","/_app":"pages/_app.js","/incidents/[id]":"pages/incidents/[id].html","/_document":"pages/_document.js","/404":"pages/404.html"}
