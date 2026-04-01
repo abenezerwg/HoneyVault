@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Environment variables
+.env
+.env.local
+backend/.env
+frontend/.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+
+# Build
+dist/
+build/
