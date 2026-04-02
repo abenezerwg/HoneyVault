@@ -117,7 +117,19 @@ export default function Dashboard() {
   }, []);
 
   const [vaultUsers, setVaultUsers] = useState([]);
-
+  const [authError, setAuthError] = useState(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    if (error === 'blocked') {
+      setAuthError('blocked');
+      // Clean up URL
+      window.history.replaceState({}, '', '/');
+    } else if (error) {
+      setAuthError(error);
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
   const loadData = useCallback(async () => {
     try {
       const [s, h, i] = await Promise.all([
