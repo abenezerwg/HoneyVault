@@ -199,5 +199,32 @@ router.get('/vault-status', async (req, res) => {
     res.status(500).json({ error: err.message, users: [] });
   }
 });
+router.post('/seed', async (req, res) => {
+  try {
+    const configs = [
+      { disguiseAs: 'github-prod', serviceProvider: 'github' },
+      { disguiseAs: 'stripe-live', serviceProvider: 'stripe' },
+      { disguiseAs: 'aws-production', serviceProvider: 'aws' },
+    ];
 
+    for (const config of configs) {
+      const { rows: existing } = await query(
+          `SELECT id FROM honeytokens WHERE disguise_as = $1 AND is_active = true`,
+          [config.disguiseAs]
+      );
+      if (existing.length > 0) continue;
+
+      const fakeClientId = `honey_${config.serviceProvider}_${Math.random().toString(36).slice(2, 10)}`;
+      await query(
+          `INSERT INTO honeytokens (client_id, label, disguise_as, vault_token_id, is_active)
+         VALUES ($1, $2, $3, $4, true)`,
+          [fakeClientId, config.disguiseAs, config.disguiseAs, null]
+      );
+    }
+
+    res.json({ seeded: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 module.exports = router;
