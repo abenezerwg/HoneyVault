@@ -111,22 +111,22 @@ export default function BlockedPage() {
           </div>
 
           {/* Back button */}
-          
-            href="/"
-            style={{
-              display: 'inline-block',
-              background: 'transparent',
-              border: '1px solid #00ff41',
-              color: '#00ff41',
-              padding: '10px 32px',
-              textDecoration: 'none',
-              fontSize: 11,
-              letterSpacing: '0.12em',
-              transition: 'all 0.2s',
-            }}
+
+          <a href="/"
+          style={{
+          display: 'inline-block',
+          background: 'transparent',
+          border: '1px solid #00ff41',
+          color: '#00ff41',
+          padding: '10px 32px',
+          textDecoration: 'none',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          transition: 'all 0.2s',
+        }}
           >
-            ← RETURN TO DASHBOARD
-          </a>
+          &#8592; RETURN TO DASHBOARD
+        </a>
         </div>
 
         <style>{`
