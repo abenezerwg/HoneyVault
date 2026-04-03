@@ -134,7 +134,12 @@ export default function Dashboard() {
       setHoneytokens(h);
       setIncidents(i.incidents || []);
 
-      const v = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tokens/vault-status`)
+      // Get current user email from Auth0 session
+      const meRes = await fetch('/api/auth/me');
+      const me = meRes.ok ? await meRes.json() : null;
+      const email = me?.email || '';
+
+      const v = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tokens/vault-status?email=${encodeURIComponent(email)}`)
           .then(r => r.json());
       setVaultUsers(v.users || []);
     } catch (e) {
