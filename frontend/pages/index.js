@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { useHoneySocket } from '../lib/useHoneySocket';
 import { fetchStats, fetchHoneytokens, fetchIncidents, triggerTestAttack } from '../lib/api';
 import IncidentCard from '../components/IncidentCard';
 import AgentLogPanel from '../components/AgentLogPanel';
 import TokenVaultMap from '../components/TokenVaultMap';
 
-// ── Vault Status Panel ─────────────────────────────────────
 function VaultStatusPanel() {
   const [status, setStatus] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +48,7 @@ function VaultStatusPanel() {
         ) : status.length === 0 ? (
             <div style={{ color: 'var(--muted)', fontSize: 11, lineHeight: 1.8 }}>
               No connected accounts yet.<br />
-              <span style={{ fontSize: 10, opacity: 0.6 }}>Click CONNECT GOOGLE above to store real credentials in Token Vault.</span>
+              <span style={{ fontSize: 10, opacity: 0.6 }}>Login with Google to see Token Vault credentials here.</span>
             </div>
         ) : (
             status.map((user, i) => (
@@ -58,9 +58,6 @@ function VaultStatusPanel() {
                   marginBottom: 8,
                   background: user.googleConnected ? 'rgba(48,209,88,0.05)' : 'rgba(255,45,85,0.05)',
                 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text)', marginBottom: 4 }}>
-                    {user.email}
-                  </div>
                   <div style={{ display: 'flex', gap: 12, fontSize: 10 }}>
               <span style={{ color: user.googleConnected ? '#30d158' : '#ff2d55' }}>
                 {user.googleConnected ? '✅ Google Connected' : '❌ Google Unlinked'}
@@ -81,7 +78,6 @@ function VaultStatusPanel() {
   );
 }
 
-// ── Stat Card ──────────────────────────────────────────────
 function StatCard({ label, value, sub, accent }) {
   return (
       <div style={{
@@ -96,7 +92,6 @@ function StatCard({ label, value, sub, accent }) {
   );
 }
 
-// ── Main Dashboard ─────────────────────────────────────────
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [honeytokens, setHoneytokens] = useState([]);
@@ -106,30 +101,28 @@ export default function Dashboard() {
   const [alertBanner, setAlertBanner] = useState(null);
   const [triggering, setTriggering] = useState(false);
   const [user, setUser] = useState(null);
+  const [vaultUsers, setVaultUsers] = useState([]);
   const alertTimerRef = useRef(null);
+  const router = useRouter();
 
-  // Fetch Auth0 session to check if user is logged in
   useEffect(() => {
     fetch('/api/auth/me')
-        .then(res => res.ok ? res.json() : null)
-        .then(data => setUser(data))
-        .catch(() => setUser(null));
+        .then(res => {
+          if (!res.ok) {
+            router.push('/login');
+            return null;
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (!data) return;
+          setUser(data);
+        })
+        .catch(() => {
+          router.push('/login');
+        });
   }, []);
 
-  const [vaultUsers, setVaultUsers] = useState([]);
-  const [authError, setAuthError] = useState(null);
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const error = params.get('error');
-    if (error === 'blocked') {
-      setAuthError('blocked');
-      // Clean up URL
-      window.history.replaceState({}, '', '/');
-    } else if (error) {
-      setAuthError(error);
-      window.history.replaceState({}, '', '/');
-    }
-  }, []);
   const loadData = useCallback(async () => {
     try {
       const [s, h, i] = await Promise.all([
@@ -141,7 +134,6 @@ export default function Dashboard() {
       setHoneytokens(h);
       setIncidents(i.incidents || []);
 
-      // Fetch vault status separately
       const v = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tokens/vault-status`)
           .then(r => r.json());
       setVaultUsers(v.users || []);
@@ -155,8 +147,6 @@ export default function Dashboard() {
   }, [loadData]);
 
   const handleSocketEvent = useCallback((event) => {
-    console.log('[Dashboard] WS event:', event.type);
-
     switch (event.type) {
       case 'honeytoken_triggered':
         setAlertBanner({
@@ -169,21 +159,18 @@ export default function Dashboard() {
         setAgentEvents([]);
         loadData();
         break;
-
       case 'agent_started':
       case 'agent_thinking':
       case 'agent_tool_call':
         setAgentEvents(prev => [...prev, { ...event, id: Date.now() }]);
         break;
-
       case 'credential_rotated':
         setAgentEvents(prev => [...prev, {
           type: 'rotation',
-          message: `🔄 Credential rotated: ${event.tokenId}`,
+          message: '🔄 Google OAuth token rotated — account blocked, sessions revoked',
           id: Date.now(),
         }]);
         break;
-
       case 'agent_complete':
         setAgentEvents(prev => [...prev, {
           type: 'complete',
@@ -220,6 +207,7 @@ export default function Dashboard() {
         </Head>
 
         <div className="hv-root">
+
           {/* Alert Banner */}
           {alertBanner && (
               <div className="hv-alert-banner">
@@ -242,6 +230,9 @@ export default function Dashboard() {
             <div className="hv-header-right">
               <div className={`hv-status-dot ${connected ? 'connected' : 'disconnected'}`} />
               <span className="hv-status-label">{connected ? 'LIVE' : 'OFFLINE'}</span>
+              <span style={{ fontSize: 10, color: 'var(--success)', letterSpacing: '0.1em' }}>
+              {user ? '● CONNECTED' : ''}
+            </span>
               <button
                   className="hv-btn-attack"
                   onClick={handleDemoAttack}
@@ -249,45 +240,23 @@ export default function Dashboard() {
               >
                 {triggering ? 'SIMULATING...' : '⚡ SIMULATE ATTACK'}
               </button>
+              <a
+                  href="/api/auth/logout"
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    color: 'var(--muted)',
+                    padding: '6px 14px',
+                    textDecoration: 'none',
+                    fontSize: 10,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                  }}
+              >
+                LOGOUT
+              </a>
             </div>
           </header>
-
-          {/* Token Vault Connect Banner */}
-          <div style={{
-            background: user ? 'rgba(48,209,88,0.08)' : 'rgba(124,92,191,0.1)',
-            borderBottom: `1px solid ${user ? 'rgba(48,209,88,0.3)' : 'rgba(124,92,191,0.3)'}`,
-            padding: '10px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: 12,
-          }}>
-            {user ? (
-                <>
-              <span style={{ color: '#30d158' }}>
-                ✅ Logged in as <strong>{user.email}</strong> — Google credentials stored in Token Vault
-              </span>
-                  <a
-                      href="/api/auth/logout"
-                      style={{ background: 'transparent', color: '#6b6b8a', padding: '6px 16px', textDecoration: 'none', fontSize: 11, letterSpacing: '0.08em', border: '1px solid var(--border)' }}
-                  >
-                    LOGOUT
-                  </a>
-                </>
-            ) : (
-                <>
-              <span style={{ color: '#7c5cbf' }}>
-                🔐 Connect your Google account to store real credentials in Token Vault
-              </span>
-                  <a
-                      href="/api/auth/login?connection=google-oauth2"
-                      style={{ background: '#7c5cbf', color: '#fff', padding: '6px 16px', textDecoration: 'none', fontSize: 11, letterSpacing: '0.08em' }}
-                  >
-                    CONNECT GOOGLE
-                  </a>
-                </>
-            )}
-          </div>
 
           {/* Stats Row */}
           <div className="hv-stats-row">
@@ -461,7 +430,6 @@ export default function Dashboard() {
             font-size: 20px;
             font-weight: 800;
             letter-spacing: 0.15em;
-            background: none;
             color: var(--accent);
             text-shadow: 0 0 20px rgba(0,255,65,0.5);
           }
@@ -473,20 +441,21 @@ export default function Dashboard() {
           .hv-status-label { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); }
 
           .hv-btn-attack {
-            background: none;
-            border: none;
-            color: #fff;
+            background: transparent;
+            border: 1px solid var(--critical);
+            color: var(--critical);
             padding: 8px 18px;
-            font-family: 'Space Mono', monospace;
-            font-size: 12px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
             font-weight: 700;
             letter-spacing: 0.08em;
             cursor: pointer;
-            clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-            transition: opacity 0.2s;
+            clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+            transition: all 0.2s;
+            text-shadow: 0 0 8px rgba(255,36,0,0.5);
           }
-          .hv-btn-attack:disabled { opacity: 0.5; cursor: not-allowed; }
-          .hv-btn-attack:not(:disabled):hover { opacity: 0.85; }
+          .hv-btn-attack:disabled { opacity: 0.4; cursor: not-allowed; }
+          .hv-btn-attack:not(:disabled):hover { background: var(--critical); color: #000; }
 
           .hv-stats-row {
             display: grid;
